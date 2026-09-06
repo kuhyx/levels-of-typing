@@ -1,0 +1,13 @@
+{
+  "name": "levels-of-typing-tools",
+  "version": "1.0.0",
+  "description": "Headless test harness for levels-of-typing (the game itself has no dependencies)",
+  "private": true,
+  "license": "MIT",
+  "scripts": {
+    "test": "node test.js"
+  },
+  "devDependencies": {
+    "jsdom": "30.0.1"
+  }
+}

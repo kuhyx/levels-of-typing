@@ -1,0 +1,685 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Levels of typing</title>
+<style>
+:root{
+  --bg:#15171c; --surface:#1c1f26; --raised:#232730; --line:#2c313b;
+  --text:#e8e4da; --muted:#8b909b; --dim:#5d626c;
+  --accent:#e5b25b; --ok:#7fc8a0; --bad:#e07b7b;
+  --f-pinky:#c084d8; --f-ring:#6fa8e8; --f-middle:#5fcfc0; --f-index:#a3cf6b; --f-thumb:#6b7180;
+  --sans:ui-sans-serif,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  --mono:ui-monospace,"SF Mono","Cascadia Mono",Menlo,Consolas,monospace;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--text);font:16px/1.5 var(--sans)}
+body{min-height:100vh;display:flex;flex-direction:column}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
+button:focus-visible,a:focus-visible,input:focus-visible,textarea:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+a{color:var(--accent)}
+p{margin:0 0 .8em}
+.wrap{width:100%;max-width:900px;margin:0 auto;padding:0 20px}
+
+/* header */
+header{padding:22px 0 10px}
+header .wrap{display:flex;align-items:baseline;justify-content:space-between;gap:16px}
+header h1{font-size:20px;font-weight:600;margin:0;letter-spacing:-.01em}
+header h1 span{color:var(--muted);font-weight:400}
+.btn{padding:8px 14px;border-radius:6px;background:var(--raised);border:1px solid var(--line);line-height:1.2}
+.btn:hover{border-color:var(--muted)}
+.btn.primary{background:var(--accent);color:#1a1405;border-color:var(--accent);font-weight:600}
+.btn.primary:hover{filter:brightness(1.06)}
+.btn.quiet{background:none;border-color:transparent;color:var(--muted)}
+.btn.quiet:hover{color:var(--text);border-color:transparent}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+
+/* ladder — a real sequence, so numbers are earned */
+.ladder{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;padding:10px 0 18px}
+.step{padding:10px 10px 8px;border-radius:6px;border:1px solid var(--line);background:var(--surface);text-align:left;display:flex;flex-direction:column;gap:2px;min-width:0}
+.step .n{font-size:12px;color:var(--muted)}
+.step .t{font-size:13px;line-height:1.25;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.step .b{font-size:11px;color:var(--dim);font-family:var(--mono)}
+.step.locked{opacity:.45;cursor:not-allowed}
+.step.active{border-color:var(--accent)}
+.step.passed .n::after{content:" ✓";color:var(--ok)}
+.step.skipped .n::after{content:" skipped";color:var(--muted);font-size:10px}
+
+main{flex:1}
+.panel{padding:6px 0 24px}
+.panel h2{font-size:26px;font-weight:600;margin:0 0 6px;letter-spacing:-.015em;line-height:1.2}
+.panel .sub{color:var(--muted);margin-bottom:18px}
+.lesson{max-width:640px}
+.lesson p{margin-bottom:.9em}
+.lesson .note{border-left:2px solid var(--accent);padding:6px 14px;color:var(--muted);margin:14px 0 18px;font-size:15px}
+.lesson .note strong{color:var(--text);font-weight:600}
+.criteria{display:flex;gap:22px;margin:16px 0 20px;color:var(--muted);font-size:14px}
+.criteria b{display:block;color:var(--text);font-size:20px;font-weight:600;font-family:var(--mono)}
+.actions{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+
+/* drill */
+.drill{display:none}
+.drill.on{display:block}
+.target{font:22px/1.7 var(--mono);letter-spacing:.02em;padding:18px 20px;background:var(--surface);border:1px solid var(--line);border-radius:8px;min-height:96px;word-break:break-word;white-space:pre-wrap;position:relative;user-select:none}
+.target span{border-radius:2px}
+.target .ok{color:var(--text)}
+.target .err{color:var(--bad);background:rgba(224,123,123,.14)}
+.target .err.sp{text-decoration:underline;text-decoration-color:var(--bad)}
+.target .cur{background:var(--accent);color:#1a1405}
+.target .todo{color:var(--dim)}
+.target.idle::after{content:"paused — idle";position:absolute;top:8px;right:12px;font:12px var(--sans);color:var(--muted)}
+.keyprompt{font:64px/1 var(--mono);text-align:center;padding:30px 0 22px}
+.keyprompt small{display:block;font:14px var(--sans);color:var(--muted);margin-top:14px}
+.stats{display:flex;gap:26px;padding:12px 4px;color:var(--muted);font-size:13px;flex-wrap:wrap}
+.stats b{color:var(--text);font-family:var(--mono);font-weight:500;font-size:15px;margin-right:4px}
+.stats .rollover{display:none}
+.stats.show-rollover .rollover{display:inline}
+.banner{display:none;padding:8px 14px;border-radius:6px;background:rgba(229,178,91,.12);border:1px solid rgba(229,178,91,.35);color:var(--accent);font-size:14px;margin:8px 0}
+.banner.on{display:block}
+.banner.error{background:rgba(224,123,123,.12);border-color:rgba(224,123,123,.4);color:var(--bad)}
+
+/* keyboard — the one loud element */
+.kb{margin:14px 0 26px;padding:14px;background:var(--surface);border:1px solid var(--line);border-radius:10px;user-select:none}
+.kb .row{display:flex;gap:5px;margin-bottom:5px}
+.kb .row:last-child{margin-bottom:0}
+.key{flex:1 0 0;height:44px;border-radius:5px;background:var(--raised);border:1px solid var(--line);display:flex;align-items:center;justify-content:center;font:14px var(--mono);color:var(--text);position:relative;transition:transform .05s}
+.key.w15{flex-grow:1.5}.key.w175{flex-grow:1.75}.key.w2{flex-grow:2}.key.w225{flex-grow:2.25}.key.w275{flex-grow:2.75}.key.w9{flex-grow:9}
+.key.mod{color:var(--muted);font:12px var(--sans)}
+.key::before{content:"";position:absolute;left:5px;right:5px;bottom:4px;height:3px;border-radius:2px;background:var(--fc,transparent);opacity:.9}
+.key.f0,.key.f7{--fc:var(--f-pinky)}
+.key.f1,.key.f6{--fc:var(--f-ring)}
+.key.f2,.key.f5{--fc:var(--f-middle)}
+.key.f3,.key.f4{--fc:var(--f-index)}
+.key.ft{--fc:var(--f-thumb)}
+.key.home::after{content:"";position:absolute;bottom:9px;width:8px;height:2px;background:var(--muted);border-radius:1px}
+.key.next{background:var(--accent);color:#1a1405;border-color:var(--accent)}
+.key.next.mod{color:#1a1405}
+.key.next::before{background:#1a1405;opacity:.35}
+.key.sfb{box-shadow:inset 0 0 0 2px var(--bad)}
+.key.down{transform:translateY(2px);background:var(--line)}
+.legend{display:flex;gap:16px;flex-wrap:wrap;font-size:12px;color:var(--muted);padding:0 2px}
+.legend i{display:inline-block;width:14px;height:3px;border-radius:2px;vertical-align:middle;margin-right:6px}
+.legend .mark{width:8px;height:2px;background:var(--muted)}
+
+/* overlays */
+.overlay{position:fixed;inset:0;background:rgba(10,11,14,.72);display:none;align-items:center;justify-content:center;padding:20px;z-index:10}
+.overlay.on{display:flex}
+.dialog{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:26px 28px;width:100%;max-width:560px;max-height:92vh;overflow:auto}
+.dialog h3{margin:0 0 4px;font-size:22px;font-weight:600;letter-spacing:-.01em}
+.dialog .verdict{color:var(--muted);margin-bottom:18px}
+.dialog .verdict.pass{color:var(--ok)}
+.dialog .verdict.fail{color:var(--bad)}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:12px;margin:0 0 18px}
+.grid div{padding:10px 12px;background:var(--raised);border-radius:6px}
+.grid small{display:block;color:var(--muted);font-size:12px}
+.grid b{font:500 20px var(--mono)}
+.slow{margin:0 0 18px;font-size:14px;color:var(--muted)}
+.slow code{font:14px var(--mono);color:var(--text);background:var(--raised);padding:2px 6px;border-radius:4px;margin-right:6px}
+.detect{padding:14px 16px;background:var(--raised);border-radius:8px;margin:0 0 18px;font-size:14px}
+.detect b{font-size:16px;font-weight:600;display:block;margin-bottom:4px}
+.detect ul{margin:8px 0 0;padding-left:18px;color:var(--muted)}
+.detect .fix{margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;color:var(--muted)}
+.field{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--line);font-size:15px}
+.field:last-of-type{border-bottom:0}
+.field small{display:block;color:var(--muted);font-size:13px}
+.field input[type=number]{width:90px;padding:6px 8px;background:var(--raised);border:1px solid var(--line);border-radius:5px;color:var(--text);font:inherit}
+.field input[type=file]{display:none}
+textarea.import{width:100%;height:90px;background:var(--raised);border:1px solid var(--line);border-radius:6px;color:var(--text);font:13px var(--mono);padding:8px}
+.toast{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);background:var(--raised);border:1px solid var(--line);padding:10px 16px;border-radius:6px;font-size:14px;opacity:0;pointer-events:none;transition:opacity .15s;z-index:20}
+.toast.on{opacity:1}
+.gate .dialog{text-align:left}
+footer{padding:14px 0 26px;color:var(--dim);font-size:12px}
+footer .wrap{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap}
+
+@media (max-width:720px){
+  .ladder{grid-template-columns:repeat(4,1fr)}
+  .target{font-size:18px}
+  .key{height:36px;font-size:12px}
+}
+@media (prefers-reduced-motion:reduce){.key,.toast{transition:none}}
+</style>
+</head>
+<body>
+<header><div class="wrap">
+  <h1>Levels of typing <span>· seven steps from hunt-and-peck to Dvorak</span></h1>
+  <button class="btn quiet" id="btnSettings">Settings</button>
+</div></header>
+
+<main><div class="wrap">
+  <nav class="ladder" id="ladder" aria-label="Levels"></nav>
+
+  <section class="panel" id="panel">
+    <h2 id="title"></h2>
+    <div class="sub" id="subtitle"></div>
+
+    <div class="lesson" id="lesson"></div>
+
+    <div class="drill" id="drill">
+      <div class="banner" id="banner"></div>
+      <div class="keyprompt" id="keyprompt" hidden></div>
+      <div class="target" id="target" hidden></div>
+      <div class="stats" id="stats">
+        <span><b id="sWpm">0</b>net wpm</span>
+        <span><b id="sAcc">100%</b>accuracy</span>
+        <span><b id="sTime">0.0s</b>active time</span>
+        <span><b id="sProg">0/0</b>keys</span>
+        <span class="rollover"><b id="sRoll">0%</b>rollover</span>
+      </div>
+      <div class="actions"><button class="btn quiet" id="btnAbort">Stop drill</button></div>
+    </div>
+  </section>
+
+  <div class="kb" id="kb" aria-hidden="true"></div>
+  <div class="legend" id="legend">
+    <span><i style="background:var(--f-pinky)"></i>pinky</span>
+    <span><i style="background:var(--f-ring)"></i>ring</span>
+    <span><i style="background:var(--f-middle)"></i>middle</span>
+    <span><i style="background:var(--f-index)"></i>index</span>
+    <span><i style="background:var(--f-thumb)"></i>thumb</span>
+    <span><i class="mark"></i>home key</span>
+  </div>
+</div></main>
+
+<footer><div class="wrap">
+  <span>Progress is saved in this browser. Export it from Settings to keep a copy.</span>
+  <span id="layoutTag">Layout: QWERTY</span>
+</div></footer>
+
+<div class="overlay" id="results"><div class="dialog" role="dialog" aria-modal="true">
+  <h3 id="rTitle">Drill complete</h3>
+  <div class="verdict" id="rVerdict"></div>
+  <div class="grid" id="rGrid"></div>
+  <div class="slow" id="rSlow"></div>
+  <div class="detect" id="rDetect" hidden></div>
+  <div class="actions" id="rActions"></div>
+</div></div>
+
+<div class="overlay" id="settings"><div class="dialog" role="dialog" aria-modal="true">
+  <h3>Settings</h3>
+  <div class="verdict">Everything here lives in this browser only.</div>
+  <div class="field"><div>Idle threshold<small>Gaps longer than this don't count toward your time.</small></div>
+    <input type="number" id="idleMs" min="1000" max="30000" step="500"> </div>
+  <div class="field"><div>Dvorak calibration<small id="calibInfo"></small></div>
+    <button class="btn" id="btnRecalib">Redo</button></div>
+  <div class="field"><div>Export progress<small>Downloads a JSON file you can import later.</small></div>
+    <button class="btn" id="btnExport">Export</button></div>
+  <div class="field"><div>Import progress<small>Paste an exported JSON file here.</small></div>
+    <button class="btn" id="btnImport">Import</button></div>
+  <textarea class="import" id="importBox" placeholder='{"version":1, ...}'></textarea>
+  <div class="field"><div>Reset everything<small>Clears all levels, stats and settings.</small></div>
+    <button class="btn" id="btnReset">Reset</button></div>
+  <div class="actions" style="margin-top:14px"><button class="btn" id="btnCloseSettings">Close</button></div>
+</div></div>
+
+<div class="overlay gate" id="gate"><div class="dialog">
+  <h3>This needs a physical keyboard</h3>
+  <p>Touch keyboards can't teach finger zones, and the browser can't tell which physical key you pressed. Open this on a computer.</p>
+  <div class="actions"><button class="btn quiet" id="btnGateBypass">Continue anyway (unsupported)</button></div>
+</div></div>
+
+<div class="toast" id="toast"></div>
+<script>
+const WORDS_HOME_Q = ["as", "ad", "ah", "ha", "add", "adds", "ads", "alas", "all", "ash", "ask", "asks", "dad", "dads", "dash", "fad", "fads", "fall", "falls", "flag", "flags", "flak", "flash", "flask", "flasks", "gag", "gags", "gal", "gala", "gall", "gals", "gas", "gash", "glad", "glass", "had", "hag", "half", "hall", "halls", "has", "hash", "jag", "jags", "lad", "lads", "lag", "lags", "lash", "lass", "sad", "sag", "saga", "sagas", "sags", "salad", "salads", "salsa", "sash", "shall", "slag", "slash", "alfalfa"];
+const WORDS_HOME_Q_SHORT = ["as", "ad", "ah", "ha", "add", "adds", "ads", "alas", "all", "ash", "ask", "asks", "dad", "dads", "dash", "fad", "fads", "fall", "flag", "flak", "gag", "gags", "gal", "gala", "gall", "gals", "gas", "gash", "glad", "had", "hag", "half", "hall", "has", "hash", "jag", "jags", "lad", "lads", "lag", "lags", "lash", "lass", "sad", "sag", "saga", "sags", "sash", "slag"];
+const WORDS_NO_SFB = ["the", "and", "for", "that", "this", "with", "but", "other", "time", "they", "site", "may", "what", "which", "their", "when", "also", "help", "view", "some", "click", "than", "find", "people", "name", "into", "email", "health", "world", "work", "products", "make", "them", "product", "system", "city", "such", "then", "good", "info", "rights", "public", "high", "through", "she", "privacy", "items", "said", "does", "mail", "map", "days", "item", "member", "hotels", "did", "send", "right", "type", "using", "take", "within", "want", "show", "black", "women", "sign", "file", "open", "today", "south", "same", "own", "both", "game", "network", "down", "systems", "total", "end", "without", "current", "big", "history", "size", "change", "small", "during", "return", "digital", "profile", "form", "main", "title", "another", "shall", "quality", "content", "little", "visit", "movies", "man", "food", "author", "sale", "print", "stock", "men", "box", "photos", "market", "air", "plan", "cost", "movie", "come", "study", "play", "issues", "comment", "mobile", "got", "park", "problem", "give", "memory", "social", "august", "language", "story", "key", "body", "field", "paper", "single", "club", "girls", "road", "changes", "night", "pay", "four", "issue", "always", "audio", "light", "blue", "given", "analysis", "possible", "might", "major", "future", "hand", "problems", "keep", "stories", "journal", "welcome", "original", "self", "others", "format", "society", "months", "sure", "able", "having", "studies", "living", "display", "means", "natural", "whether", "due", "five", "period", "says", "official", "land", "done", "window", "pro", "island", "either", "word", "works", "final", "tickets", "via", "cheap", "else", "mark", "rock", "tips", "auto", "usually", "player", "lyrics", "submit", "though", "risk", "thanks", "weight", "town", "girl", "toys", "domain", "chapter", "makes", "beauty", "taken", "half", "quick", "lake", "google", "method", "figure", "fire", "chat", "enough", "writing", "higher", "bit", "thought", "japan", "nature", "turn", "mean", "agency", "activity", "although", "drug", "income", "engine", "plans", "double", "dog", "someone", "held", "tour", "wish", "mature", "came", "jewelry", "fine", "names", "six", "bush", "islands", "rental", "woman", "bid", "middle", "division", "lesbian", "client", "returns", "sent", "shown", "culture", "band", "flash", "went", "foreign", "levels", "channel", "button", "male", "custom", "song", "focus", "female", "primary", "spring", "approach", "maps", "forms", "smith", "thank", "prior", "animal", "valley", "rentals", "cut", "hall", "anti", "networks", "owners", "paid", "hair", "classic", "command", "cities", "ensure", "patients", "wine", "vote", "owner", "animals", "ways", "rule", "mother", "door", "normal", "entire", "positive", "fitness", "output", "ring", "pacific", "vehicle", "panel", "boys", "protein", "plant", "authors", "fish", "eye", "pack"];
+const WORDS_SFB = ["from", "free", "news", "any", "services", "like", "service", "price", "just", "used", "music", "buy", "policy", "number", "support", "after", "software", "video", "school", "order", "company", "group", "need", "many", "under", "reviews", "program", "part", "great", "united", "center", "must", "travel", "made", "report", "details", "because", "local", "office", "education", "design", "posted", "community", "reserved", "subject", "forum", "long", "based", "code", "check", "special", "prices", "index", "much", "project", "section", "found", "sports", "related", "security", "county", "place", "following", "download", "access", "north", "resources", "media", "control", "art", "since", "guide", "directory", "location", "students", "account", "love", "old", "john", "insurance", "why", "property", "country", "tools", "low", "include", "college", "article", "provide", "source", "around", "process", "training", "credit", "science", "advanced", "look", "left", "select", "windows", "large", "library", "start", "model", "industry", "human", "provided", "required", "second", "forums", "medical", "friend", "server", "cart", "articles", "feedback", "looking", "street", "working", "below", "blog", "party", "payment", "login", "student", "programs", "recent", "side", "red", "young", "important", "password", "gift", "browse", "court", "groups", "making", "needs", "space", "sun", "become", "garden", "schools", "added", "reference", "listed", "energy", "run", "delivery", "reports", "try", "central", "president", "notice", "until", "cell", "color", "council", "includes", "track", "once", "agreement", "log", "friends", "trade", "edition", "further", "updated", "provides", "fun", "green", "close", "specific", "gold", "called", "short", "arts", "lot", "limited", "powered", "solutions", "director", "technical", "record", "direct", "records", "district", "front", "parts", "downloads", "sound", "resource", "document", "federal", "kids", "finance", "true", "minutes", "gifts", "edit", "videos", "percent", "function", "unit", "global", "tech", "economic", "projects", "often", "amount", "included", "deals", "heart", "received", "treatment", "knowledge", "magazine", "golf", "receive", "policies", "loan", "wide", "sort", "models", "license", "whole", "annual", "published", "shows", "church", "practice", "holiday", "designed", "along", "death", "speed", "countries", "loss", "face", "brand", "discount", "effects", "created", "yellow", "political", "advertise", "kingdom", "french", "loans", "entry", "orders", "summary", "growth", "king", "force", "port", "album", "started", "views", "sponsored", "continue", "needed", "anything", "effective", "effect", "asked", "selection", "lost", "menu", "volume", "anyone", "mortgage", "inside", "solution", "role", "certain", "executive", "running", "lower", "necessary", "union", "clothing", "skills", "advice", "decision", "huge", "kind", "taking", "object", "logo", "length", "nice", "follow", "choice", "starting", "consumer", "airport", "artist", "outside", "mode", "ideas", "structure", "fund", "summer", "allow", "degree", "contract", "wed", "located", "multiple", "editor", "featured", "idea", "cancer", "numbers", "tool", "browser", "answer", "voice", "friendly"];
+const WORDS_HOME_D = ["the", "and", "that", "this", "not", "has", "one", "site", "out", "use", "see", "his", "these", "its", "than", "date", "had", "state", "into", "used", "data", "add", "then", "she", "need", "said", "does", "set", "united", "did", "send", "those", "states", "south", "house", "end", "students", "sites", "non", "teen", "too", "estate", "note", "hot", "test", "issues", "student", "side", "east", "status", "issue", "audio", "needs", "hand", "sun", "added", "net", "head", "edition", "studies", "due", "done", "sound", "auto", "edit", "unit", "none", "death", "shoes", "notes", "seen", "institute", "soon", "needed", "season", "inside", "addition", "union", "teens", "sat", "sent", "outside", "ideas", "inn", "idea", "station", "sea", "anti", "disease", "thus", "est", "son", "iii", "units", "instead", "uses", "session", "ads", "int", "hit", "sense", "sets", "studio", "aid", "host", "hands", "dead", "ten", "hits", "die", "stand", "suite", "attention", "diet", "nation", "sheet", "situation", "stone", "tests", "shot", "heat", "saint", "thousands", "dates", "intended", "ones", "died", "assistant", "senate", "ends", "issued", "aids", "stated", "stats", "ended", "nations", "sounds", "assets", "assist", "houses", "noted", "eat", "seat", "instant", "ahead", "tea", "hide", "indeed", "nine", "dot", "suites", "hidden", "onto", "tennis", "don", "stations", "noise", "hat", "hosted", "diseases", "dean", "edited", "tested", "node", "dish", "sessions", "hate", "audit", "attend", "suit", "sit", "shots", "sheets", "stands", "heads", "asset", "sin", "seed", "thousand", "duties", "tone", "taste", "sides", "seats", "shoe", "sand", "editions", "donate", "thin", "dose", "tissue", "studios", "dad", "dust", "donations", "adds", "tie", "toe", "ease", "tend", "hunt", "den", "tones", "odds", "sons", "sad", "studied", "dated", "shoot", "assess", "stones", "southeast", "titans", "attitude", "attended", "hosts", "antenna", "ion", "seasons", "odd"];
+/* ---------- layouts ---------- */
+// Physical rows (KeyboardEvent.code). Finger index: 0 L-pinky .. 3 L-index, 4 R-index .. 7 R-pinky, 't' thumb.
+const KB_ROWS = [
+  ['Backquote','Digit1','Digit2','Digit3','Digit4','Digit5','Digit6','Digit7','Digit8','Digit9','Digit0','Minus','Equal','Backspace'],
+  ['Tab','KeyQ','KeyW','KeyE','KeyR','KeyT','KeyY','KeyU','KeyI','KeyO','KeyP','BracketLeft','BracketRight','Backslash'],
+  ['CapsLock','KeyA','KeyS','KeyD','KeyF','KeyG','KeyH','KeyJ','KeyK','KeyL','Semicolon','Quote','Enter'],
+  ['ShiftLeft','KeyZ','KeyX','KeyC','KeyV','KeyB','KeyN','KeyM','Comma','Period','Slash','ShiftRight'],
+  ['ControlLeft','AltLeft','Space','AltRight','ControlRight'],
+];
+const CODE_FINGER = {};
+(function(){
+  const f = [0,1,2,3,3,4,4,5,6,7];
+  ['KeyQ','KeyW','KeyE','KeyR','KeyT','KeyY','KeyU','KeyI','KeyO','KeyP'].forEach((c,i)=>CODE_FINGER[c]=f[i]);
+  ['KeyA','KeyS','KeyD','KeyF','KeyG','KeyH','KeyJ','KeyK','KeyL','Semicolon'].forEach((c,i)=>CODE_FINGER[c]=f[i]);
+  ['KeyZ','KeyX','KeyC','KeyV','KeyB','KeyN','KeyM','Comma','Period','Slash'].forEach((c,i)=>CODE_FINGER[c]=f[i]);
+  ['Digit1','Digit2','Digit3','Digit4','Digit5','Digit6','Digit7','Digit8','Digit9','Digit0'].forEach((c,i)=>CODE_FINGER[c]=f[i]);
+  Object.assign(CODE_FINGER,{Backquote:0,Minus:7,Equal:7,BracketLeft:7,BracketRight:7,Backslash:7,Quote:7,
+    Tab:0,CapsLock:0,ShiftLeft:0,ShiftRight:7,Enter:7,Backspace:7,Space:'t',ControlLeft:0,AltLeft:'t',AltRight:'t',ControlRight:7});
+})();
+const HOME_CODES = new Set(['KeyA','KeyS','KeyD','KeyF','KeyJ','KeyK','KeyL','Semicolon']);
+const MOD_LABEL = {Tab:'tab',CapsLock:'caps',ShiftLeft:'shift',ShiftRight:'shift',Enter:'enter',Backspace:'⌫',Space:'',ControlLeft:'ctrl',AltLeft:'alt',AltRight:'alt',ControlRight:'ctrl'};
+const KEY_WIDTH = {Backspace:'w2',Tab:'w15',Backslash:'w15',CapsLock:'w175',Enter:'w225',ShiftLeft:'w225',ShiftRight:'w275',Space:'w9',ControlLeft:'w15',AltLeft:'w15',AltRight:'w15',ControlRight:'w15'};
+
+function mkLayout(rows, shiftedRows){
+  const codes = [KB_ROWS[0].slice(0,13), KB_ROWS[1].slice(1,14), KB_ROWS[2].slice(1,12), KB_ROWS[3].slice(1,11)];
+  const map = {}, shift = {};
+  codes.forEach((row,ri)=>row.forEach((c,i)=>{ map[c]=rows[ri][i]; shift[c]=shiftedRows[ri][i]; }));
+  const charToCode = {};
+  Object.entries(map).forEach(([c,ch])=>{ charToCode[ch]={code:c,shift:false}; });
+  Object.entries(shift).forEach(([c,ch])=>{ if(!(ch in charToCode)) charToCode[ch]={code:c,shift:true}; });
+  charToCode[' ']={code:'Space',shift:false};
+  return {map, shift, charToCode};
+}
+const LAYOUTS = {
+  qwerty: mkLayout(
+    ['`1234567890-=', 'qwertyuiop[]\\', "asdfghjkl;'", 'zxcvbnm,./'],
+    ['~!@#$%^&*()_+', 'QWERTYUIOP{}|', 'ASDFGHJKL:"', 'ZXCVBNM<>?']),
+  dvorak: mkLayout(
+    ['`1234567890[]', "',.pyfgcrl/=\\", 'aoeuidhtns-', ';qjkxbmwvz'],
+    ['~!@#$%^&*(){}', '"<>PYFGCRL?+|', 'AOEUIDHTNS_', ':QJKXBMWVZ']),
+};
+function charFinger(layoutName, ch){
+  const e = LAYOUTS[layoutName].charToCode[ch.toLowerCase()] || LAYOUTS[layoutName].charToCode[ch];
+  return e ? CODE_FINGER[e.code] : null;
+}
+function handOf(f){ return f==='t' ? 't' : (f<4 ? 'L' : 'R'); }
+// same-finger bigram on two different keys
+function isSFB(layoutName, a, b){
+  if(a===b || a===' ' || b===' ') return false;
+  const fa=charFinger(layoutName,a), fb=charFinger(layoutName,b);
+  return fa!==null && fa===fb;
+}
+
+/* ---------- metrics ---------- */
+// keystrokes: [{ch, ok, iki, rollover, code}] in order (iki=null for first). idleMs: gaps above this are excluded.
+function summarize(drill, idleMs){
+  const typed = drill.typed, target = drill.target;
+  let uncorrected = 0;
+  for(let i=0;i<target.length;i++){ if(!typed[i] || typed[i].ch!==target[i]) uncorrected++; }
+  const minutes = drill.activeMs/60000;
+  const gross = minutes>0 ? (typed.length/5)/minutes : 0;
+  const net = minutes>0 ? Math.max(0, gross - uncorrected/minutes) : 0;
+  const accuracy = drill.totalKeystrokes ? 100*drill.correctKeystrokes/drill.totalKeystrokes : 100;
+  const n = drill.events.length;
+  const rollover = n>1 ? drill.rolloverCount/(n-1) : 0;
+  return {gross, net, accuracy, uncorrected, corrected:drill.correctedErrors, rollover,
+          activeMs:drill.activeMs, keystrokes:drill.totalKeystrokes, kspc: typed.length? (drill.totalKeystrokes+drill.backspaces)/typed.length : 0};
+}
+// mean IKI per target word, using events that landed on the right position
+function slowWords(drill, idleMs){
+  const words = []; let start=0;
+  for(let i=0;i<=drill.target.length;i++){
+    if(i===drill.target.length || drill.target[i]===' '){ if(i>start) words.push({w:drill.target.slice(start,i),s:start,e:i}); start=i+1; }
+  }
+  const out = [];
+  for(const w of words){
+    const ikis = drill.events.filter(ev=>ev.pos>w.s && ev.pos<w.e && ev.iki!==null && ev.iki<=idleMs).map(ev=>ev.iki);
+    if(ikis.length>=2) out.push({word:w.w, iki:ikis.reduce((a,b)=>a+b,0)/ikis.length});
+  }
+  return out.sort((a,b)=>b.iki-a.iki);
+}
+
+/* ---------- hunt-and-peck detector ---------- */
+// Timing can't recover finger count; this estimates typing FLUENCY and reports honest confidence.
+function detectStyle(events, idleMs){
+  const ikis = events.filter(e=>e.iki!==null && e.iki<=idleMs).map(e=>e.iki);
+  const n = events.length;
+  if(ikis.length<20) return {bucket:'unknown', fluency:0, confidence:0, n, notes:['Not enough keystrokes to estimate.']};
+  const mean = ikis.reduce((a,b)=>a+b,0)/ikis.length;
+  const sd = Math.sqrt(ikis.reduce((a,b)=>a+(b-mean)**2,0)/ikis.length);
+  const cv = sd/mean;
+  const sorted = [...ikis].sort((a,b)=>a-b), median = sorted[Math.floor(sorted.length/2)];
+  const longPause = ikis.filter(x=>x>3*median).length/ikis.length;
+  const roll = n>1 ? events.filter(e=>e.rollover).length/(n-1) : 0;
+  const lin = (x,lo,hi)=>Math.max(0,Math.min(1,(x-lo)/(hi-lo)));
+  const sRoll = lin(roll,0.05,0.35);          // Dhakal 2018: slow ~8%, fast 40-70%
+  const sMean = 1-lin(mean,150,450);          // fast ~120-180 ms, slow >450 ms
+  const sCv   = 1-lin(cv,0.4,1.0);            // consistency
+  const sPause= 1-lin(longPause,0.03,0.15);   // search pauses (visual-search proxy)
+  const fluency = 0.4*sRoll + 0.3*sMean + 0.15*sCv + 0.15*sPause;
+  const bucket = fluency<0.35 ? 'hunt' : fluency>0.65 ? 'fluent' : 'mixed';
+  const edge = Math.min(Math.abs(fluency-0.35), Math.abs(fluency-0.65));
+  const confidence = Math.min(0.95, 0.5 + 2*edge) * Math.min(1, n/200);
+  const notes = [];
+  notes.push(`${Math.round(roll*100)}% of keypresses overlapped the previous one`);
+  notes.push(`${Math.round(mean)} ms between keys on average, consistency ${cv<0.5?'high':cv<0.8?'medium':'low'}`);
+  notes.push(`${Math.round(longPause*100)}% of gaps were long pauses (a proxy for looking down)`);
+  return {bucket, fluency, confidence, n, notes, features:{roll,mean,cv,longPause}};
+}
+
+/* ---------- levels ---------- */
+const SENTENCES = [
+  'The quick brown fox jumps over the lazy dog.',
+  'She sold small shells by the sea shore, and it went well.',
+  'My uncle bought a used car last week for a very good price.',
+  'Please send the report before noon on Friday.',
+  'Every morning he walks the dog around the park twice.',
+  'The train to the city leaves at nine, so we should hurry.',
+  'I think the new phone has a much better camera.',
+  'Bring a jacket, because the evening might get cold.',
+  'Our team fixed the bug and shipped the update on time.',
+  'Nobody knew why the lights kept flickering all night.',
+];
+function pick(arr, n){ const a=[...arr]; for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];} return a.slice(0,n); }
+function wordsDrill(list, n=20){
+  const out=[]; while(out.length<n){ for(const w of pick(list,list.length)){ if(out.length>=n) break; if(out[out.length-1]!==w || list.length<2) out.push(w); } }
+  return out.join(' ');
+}
+function diagnosticPassage(){ let s=[], len=0; for(const x of pick(SENTENCES,SENTENCES.length)){ s.push(x); len+=x.length+1; if(len>=220) break; } return s.join(' '); }
+function keyPrompts(n=40){ const keys='abcdefghijklmnopqrstuvwxyz  '.split(''); const out=[]; while(out.length<n){ const k=keys[Math.floor(Math.random()*keys.length)]; if(k!==out[out.length-1]) out.push(k); } return out; }
+function sfbWarmup(){
+  const pairs=['ed','de','ce','ec','un','nu','my','lo','ol','br','ft','sw']; const out=[];
+  for(const p of pick(pairs,6)) out.push((p+' ').repeat(3).trim());
+  return out.join(' ');
+}
+
+const LEVELS = [
+  {n:1, short:'Keyboard', title:'The keyboard', sub:'What the keys are and where they live', wpm:0, mode:'keys',
+   explain:[
+    'A keyboard is a grid of keys. The main letter block plus the space bar produce almost all text you will ever type.',
+    'The small bumps on F and J are landmarks. Your index fingers rest on them so both hands can find their place without looking.',
+    'Shift makes capitals and the upper symbols. Backspace deletes the last character. Enter confirms or starts a new line.',
+   ], note:'This level is orientation, not speed. Find the key the game shows, press it, repeat 40 times.', drillLabel:'Find 40 keys'},
+  {n:2, short:'Hunt and peck', title:'Hunt and peck', sub:'What it is, what it costs, and how you type right now', wpm:0, mode:'diagnostic',
+   explain:[
+    'Hunt and peck means searching for each key, usually with one or two fingers per hand, glancing down as you go.',
+    'It can be fast. In a motion-capture study (Feit, Weir & Oulasvirta, 2016) self-taught typists using about six fingers matched touch typists at roughly 58 wpm.',
+    'The cost is elsewhere: hunt-and-peck typists spent 40% of the time looking at the keyboard versus 20% for touch typists. Eyes on the keys means slower editing, missed errors, more finger travel, and a lower ceiling.',
+   ], note:'Type the passage the way you normally type. The game will estimate your style from timing alone, so it reports a confidence, not a verdict. It cannot see your fingers.', drillLabel:'Type the passage'},
+  {n:3, short:'Home row', title:'Touch typing and the home row', sub:'Eight fingers, eight home keys, eyes on the screen', wpm:15, mode:'text', words:()=>WORDS_HOME_Q_SHORT,
+   explain:[
+    'Touch typing rests eight fingers on the home row: A S D F for the left hand, J K L ; for the right. Every finger returns home after each key, so you never lose your place.',
+    'The bumps on F and J let you find home by feel. From here the discipline is simple: look at the screen, not the keys, and let the on-screen keyboard below be your map.',
+    'Accuracy first. Speed is a side effect of correct movements repeated; fast wrong movements only get faster at being wrong.',
+   ], note:'Short home-row words only. Rest your fingers on the home keys and keep them there.', drillLabel:'Start drill'},
+  {n:4, short:'Finger zones', title:'Finger zones', sub:'Each key belongs to one finger', wpm:20, mode:'text', words:()=>WORDS_HOME_Q,
+   explain:[
+    'On a QWERTY keyboard each key belongs to a specific finger: the coloured strips below show the zones. The index fingers cover two columns each; the others cover one.',
+    'Words built only from home-row keys, like "lass" or "flask", let you feel the right finger for each letter with no reaching. Nothing has to move ahead of time, so the only thing being trained is the finger-to-key mapping.',
+    'That mapping is the foundation. Every later speed gain rides on it being automatic.',
+   ], note:'The game can only see which key you pressed, not which finger pressed it. Finger hints are guidance, never a fail.', drillLabel:'Start drill'},
+  {n:5, short:'Preloading', title:'Finger preloading', sub:'Fingers move to the next key before the current one is done', wpm:30, mode:'text', words:()=>WORDS_NO_SFB, rollover:true, slow:true,
+   explain:[
+    'As you get fluent, fingers start moving toward upcoming keys early, and you press the next key before releasing the last. That overlap is called rollover, and in a study of 168,000 typists (Dhakal et al., 2018) it was the strongest timing correlate of speed: fast typists overlapped 40 to 70% of keypresses.',
+    'Alternating hands helps too. Salthouse (1986) measured keystrokes on alternate hands as 30 to 60 ms faster than same-hand keystrokes.',
+    'You cannot force this; it grows with practice under the right conditions. These words spread letters across fingers and hands so preloading pays off. Words that slow you down are queued so you can drill them on their own.',
+   ], note:'Watch the rollover meter. It rises on its own as movements overlap.', drillLabel:'Start drill', altLabel:'Drill my slow words'},
+  {n:6, short:'Same finger', title:'Breaking the zones', sub:'Two letters in a row on the same finger', wpm:25, mode:'text', words:()=>WORDS_SFB, warmup:true,
+   explain:[
+    'Some letter pairs are typed by the same finger on two different keys: c then e in "cent", e then d in "bed", u then n in "hunt". That finger has to move twice in a row and cannot preload. These same-finger bigrams are the slowest transitions on the keyboard.',
+    'The penalty is large. Same-hand digraphs already run about 50 ms slower than two-hand ones (Salthouse, 1984), and same-finger sequences are far worse again.',
+    'Drilling them on their own builds control for the words that break your rhythm. The target below outlines the two keys in red when the next pair shares a finger.',
+   ], note:'The pass target is lower than the last level on purpose. These words are slower for everyone.', drillLabel:'Start drill', altLabel:'Bigram warm-up'},
+  {n:7, short:'Dvorak', title:'Custom layouts: Dvorak', sub:'A layout is just software', wpm:15, mode:'text', words:()=>WORDS_HOME_D, layout:'dvorak',
+   explain:[
+    'A layout is a mapping from physical keys to characters. Change the mapping and the same keyboard types a different alphabet.',
+    'Dvorak puts all the vowels on the left home row and the common consonants on the right, so hands alternate far more often: about 62% of successive keystrokes switch hands on Dvorak versus 51% on QWERTY.',
+    'The game remaps your keystrokes in the browser, so nothing changes on your computer. Expect to feel slow. Everyone does for the first weeks.',
+   ], note:'Home-row words on Dvorak: a o e u i on the left, d h t n s on the right. The on-screen keyboard shows the Dvorak legends.', drillLabel:'Start drill'},
+];
+
+/* ---------- state & persistence ---------- */
+const STORE_KEY = 'typinggame.v1';
+const defaultState = () => ({version:1, unlocked:1, current:1, perLevel:{}, detector:null, slowWords:[], settings:{idleMs:5000}, dvorak:{os:null}, skipped:[]});
+let S = defaultState();
+function load(){
+  try{ const raw=localStorage.getItem(STORE_KEY); if(raw){ const p=JSON.parse(raw); if(p && p.version===1) S=Object.assign(defaultState(),p); } }
+  catch(e){ toast('Saved progress could not be read; starting fresh.'); }
+}
+function save(){
+  try{ localStorage.setItem(STORE_KEY, JSON.stringify(S)); }
+  catch(e){ toast(e && e.name==='QuotaExceededError' ? 'Storage is full; progress not saved.' : 'Could not save progress (private browsing?).'); }
+}
+const $ = id => document.getElementById(id);
+let toastT; function toast(msg){ const t=$('toast'); t.textContent=msg; t.classList.add('on'); clearTimeout(toastT); toastT=setTimeout(()=>t.classList.remove('on'),2600); }
+const lvl = () => LEVELS[S.current-1];
+const perLevel = n => S.perLevel[n] || (S.perLevel[n]={bestNetWPM:0,bestAccuracy:0,passed:false,attempts:0});
+
+/* ---------- keyboard ---------- */
+let activeLayout='qwerty';
+function buildKeyboard(name){
+  activeLayout=name; const L=LAYOUTS[name]; const kb=$('kb'); kb.innerHTML='';
+  for(const row of KB_ROWS){
+    const r=document.createElement('div'); r.className='row';
+    for(const code of row){
+      const k=document.createElement('div'); k.dataset.code=code;
+      const f=CODE_FINGER[code]; k.className='key '+(f==='t'?'ft':'f'+f)+(KEY_WIDTH[code]?' '+KEY_WIDTH[code]:'')+(HOME_CODES.has(code)?' home':'');
+      if(code in MOD_LABEL){ k.classList.add('mod'); k.textContent=MOD_LABEL[code]; }
+      else k.textContent=L.map[code];
+      r.appendChild(k);
+    }
+    kb.appendChild(r);
+  }
+  $('layoutTag').textContent='Layout: '+(name==='dvorak'?'Dvorak (remapped in browser)':'QWERTY');
+}
+const keyEl = code => $('kb').querySelector(`[data-code="${code}"]`);
+function clearKeyClasses(cls){ $('kb').querySelectorAll('.'+cls).forEach(e=>e.classList.remove(cls)); }
+function showNext(ch, sfbWith){
+  clearKeyClasses('next'); clearKeyClasses('sfb');
+  if(ch===undefined) return;
+  const e=LAYOUTS[activeLayout].charToCode[ch]; if(!e) return;
+  keyEl(e.code)?.classList.add('next');
+  if(e.shift){ const sh = CODE_FINGER[e.code]<4 ? 'ShiftRight':'ShiftLeft'; keyEl(sh)?.classList.add('next'); }
+  if(sfbWith){ const e2=LAYOUTS[activeLayout].charToCode[sfbWith]; keyEl(e.code)?.classList.add('sfb'); if(e2) keyEl(e2.code)?.classList.add('sfb'); }
+}
+
+/* ---------- ladder & panel ---------- */
+function renderLadder(){
+  const el=$('ladder'); el.innerHTML='';
+  LEVELS.forEach(l=>{
+    const p=S.perLevel[l.n]; const b=document.createElement('button');
+    const locked=l.n>S.unlocked;
+    b.className='step'+(locked?' locked':'')+(l.n===S.current?' active':'')+(p&&p.passed?' passed':'')+(S.skipped.includes(l.n)?' skipped':'');
+    b.disabled=locked;
+    b.innerHTML=`<span class="n">Level ${l.n}</span><span class="t">${l.short}</span><span class="b">${p&&p.bestNetWPM?Math.round(p.bestNetWPM)+' wpm':locked?'locked':'—'}</span>`;
+    b.onclick=()=>{ if(!locked){ abortDrill(); S.current=l.n; save(); renderPanel(); } };
+    el.appendChild(b);
+  });
+}
+function renderPanel(){
+  const l=lvl(); renderLadder();
+  buildKeyboard(l.layout||'qwerty');
+  $('title').textContent=`Level ${l.n}: ${l.title}`; $('subtitle').textContent=l.sub;
+  const le=$('lesson'); le.style.display='block'; $('drill').classList.remove('on');
+  let html=l.explain.map(p=>`<p>${p}</p>`).join('')+`<div class="note">${l.note}</div>`;
+  const p=perLevel(l.n);
+  html+=`<div class="criteria"><div><b>95%</b>accuracy to pass</div>${l.wpm?`<div><b>${l.wpm}</b>net wpm to pass</div>`:''}<div><b>${p.bestNetWPM?Math.round(p.bestNetWPM):'—'}</b>your best</div><div><b>${p.attempts}</b>attempts</div></div>`;
+  html+=`<div class="actions"><button class="btn primary" id="btnStart">${l.drillLabel}</button>`;
+  if(l.slow) html+=`<button class="btn" id="btnAlt" ${S.slowWords.length<3?'disabled title="Complete a drill first to collect slow words"':''}>${l.altLabel} (${S.slowWords.length})</button>`;
+  if(l.warmup) html+=`<button class="btn" id="btnAlt">${l.altLabel}</button>`;
+  if(l.n===2 && S.detector) html+=`<span style="color:var(--muted);font-size:14px">Last estimate: ${styleLabel(S.detector)}</span>`;
+  html+='</div>';
+  if(l.n===7){ const os=S.dvorak.os; html+=`<p style="margin-top:14px;color:var(--muted);font-size:14px">${os==='dvorak'?'Your system already types Dvorak, so the browser remap is off and your keys are used as they are.':os?'Remap is on: your physical QWERTY keys produce Dvorak letters here only.':'The first drill starts with a one-key calibration to check what your system already does.'}</p>`; }
+  le.innerHTML=html;
+  $('btnStart').onclick=()=>startDrill('main');
+  const alt=$('btnAlt'); if(alt) alt.onclick=()=>startDrill('alt');
+  showNext();
+}
+function styleLabel(d){ return d.userOverride ? `you said "${d.userOverride==='fluent'?'fluent':'hunt and peck'}"` : d.bucket==='hunt'?'likely hunt and peck':d.bucket==='fluent'?'likely fluent':d.bucket==='mixed'?'mixed':'unknown'; }
+
+/* ---------- drill ---------- */
+let D=null;               // active drill
+let downSet=new Set();    // physical keys currently held (non-modifier)
+let warnedLayout=false;
+let calib=null;           // pending Dvorak calibration callback
+const IDLE = () => S.settings.idleMs;
+
+function startDrill(kind){
+  const l=lvl();
+  if(l.n===7 && !S.dvorak.os){ runCalibration(()=>startDrill(kind)); return; }
+  let target, mode=l.mode, isDiag=false;
+  if(l.mode==='keys'){ target=keyPrompts(40).join(''); }
+  else if(l.mode==='diagnostic'){ target=diagnosticPassage(); mode='text'; isDiag=true; }
+  else if(kind==='alt' && l.slow){ target=wordsDrill(S.slowWords.map(x=>x.word),20); }
+  else if(kind==='alt' && l.warmup){ target=sfbWarmup(); }
+  else target=wordsDrill(l.words(),20);
+  D={mode, kind, isDiag, target, typed:[], events:[], startTs:null, lastDownTs:null, activeMs:0, idle:false,
+     correctKeystrokes:0, totalKeystrokes:0, correctedErrors:0, backspaces:0, rolloverCount:0, correct:0};
+  downSet.clear();
+  $('lesson').style.display='none'; $('drill').classList.add('on');
+  $('stats').classList.toggle('show-rollover', !!(l.rollover||isDiag));
+  $('keyprompt').hidden = mode!=='keys'; $('target').hidden = mode==='keys';
+  $('banner').className='banner';
+  renderDrill();
+}
+function abortDrill(){ if(!D && !calib) return; D=null; calib=null; $('banner').className='banner'; $('lesson').style.display='block'; $('drill').classList.remove('on'); showNext(); }
+let tick=null;
+function renderDrill(){
+  if(!D) return;
+  if(D.mode==='keys'){
+    const ch=D.target[D.typed.length]; const done=D.typed.length>=D.target.length;
+    $('keyprompt').innerHTML = done?'':(ch===' '?'␣<small>space bar</small>':ch+`<small>press this key · ${D.typed.length+1} of ${D.target.length}</small>`);
+    showNext(ch);
+    $('sProg').textContent=`${D.typed.length}/${D.target.length}`; $('sAcc').textContent=D.totalKeystrokes?Math.round(100*D.correctKeystrokes/D.totalKeystrokes)+'%':'100%';
+    $('sWpm').textContent='—'; $('sTime').textContent='—';
+    return;
+  }
+  const t=$('target'); const parts=[]; const pos=D.typed.length;
+  for(let i=0;i<D.target.length;i++){
+    const c=D.target[i]; const shown=c===' '?' ':c;
+    if(i<pos){ const ok=D.typed[i].ch===c; parts.push(`<span class="${ok?'ok':'err'}${c===' '?' sp':''}">${ok||c!==' '?shown:D.typed[i].ch}</span>`); }
+    else if(i===pos) parts.push(`<span class="cur">${shown}</span>`);
+    else parts.push(`<span class="todo">${shown}</span>`);
+  }
+  t.innerHTML=parts.join('');
+  t.classList.toggle('idle', D.idle);
+  const nxt=D.target[pos], after=D.target[pos+1];
+  showNext(nxt, (nxt!==undefined && after!==undefined && lvl().n===6 && isSFB(activeLayout,nxt,after)) ? after : null);
+  const m=summarize(D, IDLE());
+  $('sWpm').textContent=D.activeMs>0?Math.round(m.net):'0'; $('sAcc').textContent=Math.round(m.accuracy)+'%';
+  $('sTime').textContent=(D.activeMs/1000).toFixed(1)+'s'; $('sProg').textContent=`${pos}/${D.target.length}`;
+  $('sRoll').textContent=Math.round(m.rollover*100)+'%';
+}
+function onChar(ch, code, rollover){
+  const now=performance.now();
+  if(D.mode==='keys'){
+    const want=D.target[D.typed.length]; const ok=ch.toLowerCase()===want;
+    D.totalKeystrokes++; if(ok) D.correctKeystrokes++;
+    flash(code);
+    if(ok) D.typed.push({ch,ok:true}); else { $('banner').className='banner on error'; $('banner').textContent=`That was "${ch===' '?'space':ch}". Look for "${want===' '?'the space bar':want}" — it is highlighted below.`; renderDrill(); return; }
+    $('banner').className='banner';
+    if(D.typed.length>=D.target.length) finishDrill(); else renderDrill();
+    return;
+  }
+  const pos=D.typed.length, ok=ch===D.target[pos];
+  let iki=null;
+  if(D.startTs===null){ D.startTs=now; }
+  else { iki=now-D.lastDownTs; if(iki<=IDLE()) D.activeMs+=iki; }
+  D.lastDownTs=now; D.idle=false;
+  D.totalKeystrokes++; if(ok) D.correctKeystrokes++; if(rollover) D.rolloverCount++;
+  D.typed.push({ch,ok}); D.events.push({t:now,iki,code,ch,ok,rollover,pos});
+  flash(code);
+  if(D.typed.length>=D.target.length) finishDrill(); else renderDrill();
+}
+function onBackspace(){ if(D.mode==='keys'||!D.typed.length) return; const last=D.typed.pop(); D.backspaces++; if(!last.ok) D.correctedErrors++; renderDrill(); }
+function flash(code){ const k=keyEl(code); if(!k) return; k.classList.add('down'); setTimeout(()=>k.classList.remove('down'),90); }
+tick=setInterval(()=>{ if(D && D.mode==='text' && D.startTs!==null && !D.idle && performance.now()-D.lastDownTs>IDLE()){ D.idle=true; $('target').classList.add('idle'); } },500);
+
+function finishDrill(){
+  const l=lvl(), p=perLevel(l.n); p.attempts++;
+  let passed, grid=[], slowHtml='', detect=null;
+  if(D.mode==='keys'){
+    const acc=100*D.correctKeystrokes/D.totalKeystrokes; passed=acc>=95;
+    grid=[['Correct keys',`${D.correctKeystrokes}/${D.totalKeystrokes}`],['Accuracy',Math.round(acc)+'%']];
+    p.bestAccuracy=Math.max(p.bestAccuracy,acc);
+  } else {
+    const m=summarize(D, IDLE());
+    passed = m.accuracy>=95 && m.net>=l.wpm;
+    grid=[['Net wpm',Math.round(m.net)],['Gross wpm',Math.round(m.gross)],['Accuracy',Math.round(m.accuracy)+'%'],['Uncorrected errors',m.uncorrected],['Corrected errors',m.corrected],['Active time',(m.activeMs/1000).toFixed(1)+'s']];
+    if(l.rollover||D.isDiag) grid.push(['Rollover',Math.round(m.rollover*100)+'%']);
+    p.bestAccuracy=Math.max(p.bestAccuracy,m.accuracy); if(m.accuracy>=95) p.bestNetWPM=Math.max(p.bestNetWPM,m.net);
+    const all=slowWords(D, IDLE()), sw=all.slice(0,3);
+    if(sw.length && D.kind!=='alt' && l.mode==='text') slowHtml='Slowest words: '+sw.map(x=>`<code>${x.word}</code>`).join('')+`<span>(${Math.round(sw[0].iki)} ms/key)</span>`;
+    if(l.slow && all.length){
+      for(const x of all){ const i=S.slowWords.findIndex(y=>y.word===x.word); if(i>=0) S.slowWords[i]=x; }   // any drill refreshes known words
+      if(D.kind!=='alt') for(const x of sw){ if(!S.slowWords.some(y=>y.word===x.word)) S.slowWords.push(x); }
+      S.slowWords.sort((p,q)=>q.iki-p.iki); S.slowWords=S.slowWords.slice(0,30);
+    }
+    if(D.isDiag){ detect=detectStyle(D.events, IDLE()); S.detector={bucket:detect.bucket,fluency:detect.fluency,confidence:detect.confidence,n:detect.n,notes:detect.notes,userOverride:null}; }
+  }
+  const practice = D.kind==='alt';
+  if(passed && !practice){ p.passed=true; if(l.n<7) S.unlocked=Math.max(S.unlocked,l.n+1); }
+  save();
+  showResults(passed, grid, slowHtml, detect, practice);
+  D=null; $('lesson').style.display='block'; $('drill').classList.remove('on'); showNext();
+}
+function showResults(passed, grid, slowHtml, detect, practice){
+  const l=lvl();
+  $('rTitle').textContent = practice ? 'Practice drill done' : passed ? 'Passed' : 'Not yet';
+  const v=$('rVerdict'); v.className='verdict '+(practice?'':passed?'pass':'fail');
+  v.textContent = practice ? (passed?'That would have passed. Practice drills do not unlock levels; run the main drill.':'Practice drills do not unlock levels. Keep at it, then run the main drill.') : passed ? (l.n<7?`Level ${l.n+1} is unlocked.`:'You have finished the ladder.') : (l.wpm?`Need 95% accuracy and ${l.wpm} net wpm in one drill. Aim for 98% accuracy; speed follows.`:'Need 95% correct. Slow down and look for the highlighted key.');
+  $('rGrid').innerHTML=grid.map(([k,val])=>`<div><small>${k}</small><b>${val}</b></div>`).join('');
+  $('rSlow').innerHTML=slowHtml;
+  const d=$('rDetect'); d.hidden=!detect;
+  const acts=[];
+  if(detect){
+    const label=detect.bucket==='hunt'?'Your typing looks mostly hunt and peck':detect.bucket==='fluent'?'Your typing looks fluent':detect.bucket==='mixed'?'Your typing looks mixed':'Could not estimate your style';
+    d.innerHTML=`<b>${label} <span style="color:var(--muted);font-weight:400">(confidence ${Math.round(detect.confidence*100)}%)</span></b>Timing alone cannot tell how many fingers you use; a fast six-finger typist looks identical to a touch typist here.<ul>${detect.notes.map(n=>`<li>${n}</li>`).join('')}</ul><div class="fix">This is wrong, I type: <button class="btn" id="ovHunt">hunt and peck</button><button class="btn" id="ovFluent">fluently</button></div>`;
+    $('ovHunt').onclick=()=>{S.detector.userOverride='hunt';save();toast('Noted.');renderSkip();}; $('ovFluent').onclick=()=>{S.detector.userOverride='fluent';save();toast('Noted.');renderSkip();};
+  }
+  $('rActions').innerHTML='';
+  const mk=(t,cls,fn)=>{const b=document.createElement('button');b.className='btn '+cls;b.textContent=t;b.onclick=fn;$('rActions').appendChild(b);return b;};
+  mk(passed&&!practice?'Try again for a better score':'Try again','',()=>{const k=practice?'alt':'main';closeResults();startDrill(k);});
+  if(passed && !practice && l.n<7) mk(`Go to level ${l.n+1}`,'primary',()=>{closeResults();S.current=l.n+1;save();renderPanel();});
+  mk('Close','quiet',closeResults);
+  function renderSkip(){ const old=$('btnSkip'); if(old) old.remove(); if(!skipEligible()) return; const b=mk('Skip to level 6 (test out)','',()=>{closeResults();S.unlocked=Math.max(S.unlocked,6);[3,4,5].forEach(n=>{if(!perLevel(n).passed&&!S.skipped.includes(n))S.skipped.push(n)});S.current=6;save();renderPanel();}); b.id='btnSkip'; }
+  if(passed && l.n===2) renderSkip();
+  $('results').classList.add('on');
+}
+function skipEligible(){ const d=S.detector; return !!d && perLevel(2).passed && (d.userOverride==='fluent' || (!d.userOverride && d.bucket==='fluent' && d.confidence>=0.7)); }
+function closeResults(){ $('results').classList.remove('on'); renderPanel(); }
+
+/* ---------- Dvorak calibration ---------- */
+function runCalibration(then){
+  calib=then;
+  $('lesson').style.display='none'; $('drill').classList.add('on'); $('target').hidden=true; $('keyprompt').hidden=false;
+  $('keyprompt').innerHTML='Q<small>Press the key with Q printed on it, so the game can check what your system already types.</small>';
+  showNext();
+}
+function onCalibKey(e){
+  if(e.key==='Escape'){ abortDrill(); return; }
+  if(e.code!=='KeyQ'){ $('banner').className='banner on'; $('banner').textContent='That was a different key. Press the physical Q key.'; return; }
+  const k=e.key.toLowerCase();
+  S.dvorak.os = k==='q' ? 'qwerty' : k==="'" ? 'dvorak' : 'other';
+  save(); const fn=calib; calib=null; $('banner').className='banner';
+  if(S.dvorak.os==='dvorak') toast('Your system already types Dvorak. Browser remap is off.');
+  else if(S.dvorak.os==='other') toast(`Your system typed "${e.key}" for Q. Remapping by physical key anyway.`);
+  else toast('QWERTY system detected. Dvorak remap is on for this level.');
+  fn();
+}
+const remapActive = () => lvl().layout==='dvorak' && S.dvorak.os!=='dvorak';
+
+/* ---------- input ---------- */
+document.addEventListener('keydown', e=>{
+  if(e.target && (e.target.tagName==='INPUT'||e.target.tagName==='TEXTAREA')) return;
+  if($('results').classList.contains('on')||$('settings').classList.contains('on')) return;
+  if(calib){ e.preventDefault(); onCalibKey(e); return; }
+  if(!D) return;
+  if((e.ctrlKey||e.metaKey) && e.key.toLowerCase()==='v'){ e.preventDefault(); toast('Paste is blocked in drills.'); return; }
+  if(e.ctrlKey||e.metaKey||e.altKey) return;
+  if(e.key==='Escape'){ abortDrill(); return; }
+  if(e.key==='Backspace'){ e.preventDefault(); onBackspace(); return; }
+  if(e.repeat) return;
+  if(e.getModifierState && e.getModifierState('CapsLock')){ const b=$('banner'); if(!b.classList.contains('error')){ b.className='banner on'; b.textContent='Caps Lock is on.'; } }
+  else if($('banner').textContent==='Caps Lock is on.') $('banner').className='banner';
+  let ch=null;
+  if(remapActive()){ const L=LAYOUTS.dvorak; if(e.code in L.map){ ch=e.shiftKey?L.shift[e.code]:L.map[e.code]; if(e.getModifierState('CapsLock')&&/[a-z]/i.test(ch)) ch=e.shiftKey?ch.toLowerCase():ch.toUpperCase(); } else if(e.code==='Space') ch=' '; }
+  else if(e.key.length===1) ch=e.key;
+  if(ch===null) return;
+  if(!remapActive() && !warnedLayout && /^Key[A-Z]$/.test(e.code) && /^[a-z]$/i.test(e.key) && e.key.toLowerCase()!==e.code[3].toLowerCase()){ warnedLayout=true; toast('Your system layout is not US QWERTY. Only US QWERTY is supported; results may be off.'); }
+  e.preventDefault();
+  const rollover=downSet.size>0;
+  downSet.add(e.code);
+  onChar(ch, e.code, rollover);
+});
+document.addEventListener('keyup', e=>{ downSet.delete(e.code); });
+window.addEventListener('blur', ()=>downSet.clear());
+document.addEventListener('paste', e=>{ if(D){ e.preventDefault(); toast('Paste is blocked in drills.'); } });
+$('btnAbort').onclick=abortDrill;
+
+/* ---------- settings ---------- */
+$('btnSettings').onclick=()=>{ abortDrill(); $('idleMs').value=S.settings.idleMs; $('calibInfo').textContent=S.dvorak.os?`Detected: ${S.dvorak.os==='qwerty'?'QWERTY system, remap on':S.dvorak.os==='dvorak'?'Dvorak system, remap off':'other layout, remap by physical key'}`:'Not done yet. Runs automatically before the first Dvorak drill.'; $('settings').classList.add('on'); };
+$('btnCloseSettings').onclick=()=>{ const v=parseInt($('idleMs').value,10); if(v>=1000&&v<=30000) S.settings.idleMs=v; save(); $('settings').classList.remove('on'); renderPanel(); };
+$('btnRecalib').onclick=()=>{ S.dvorak.os=null; save(); $('calibInfo').textContent='Cleared. Runs before the next Dvorak drill.'; toast('Calibration cleared.'); };
+$('btnExport').onclick=()=>{ const blob=new Blob([JSON.stringify(S,null,2)],{type:'application/json'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='levels-of-typing-progress.json'; a.click(); setTimeout(()=>URL.revokeObjectURL(a.href),1000); };
+$('btnImport').onclick=()=>{ try{ const p=JSON.parse($('importBox').value); if(!p||p.version!==1||typeof p.unlocked!=='number') throw 0; S=Object.assign(defaultState(),p); S.unlocked=Math.min(7,Math.max(1,S.unlocked)); S.current=Math.min(S.unlocked,Math.max(1,S.current)); save(); $('importBox').value=''; toast('Progress imported.'); }catch(e){ toast('That is not a valid export file.'); } };
+$('btnReset').onclick=()=>{ if(confirm('Clear all progress and settings?')){ S=defaultState(); save(); toast('Reset.'); renderPanel(); } };
+
+/* ---------- boot ---------- */
+load();
+if(matchMedia('(hover: none) and (pointer: coarse)').matches) $('gate').classList.add('on');
+$('btnGateBypass').onclick=()=>$('gate').classList.remove('on');
+renderPanel();
+window.__game={LAYOUTS,isSFB,summarize,detectStyle,save,renderPanel,abortDrill,get S(){return S},set S(v){S=v},get D(){return D},get calib(){return calib}};
+
+</script>
+</body>
+</html>
