@@ -45,6 +45,10 @@ npm --prefix tools ci && node tools/test.js # headless functional test, expects 
 
 `test.js` fakes `performance.now()` and `matchMedia`, dispatches KeyboardEvents on `document`, and reads state through `window.__game` (a small debug hook at the end of `src/app.js`).
 
+## Release
+
+Live at https://kuhyx.itch.io/levels-of-typing (free, played in the browser). To push a new build: commit, then `tools/publish_itch.sh` (refuses a dirty tree or a stale `dist/`, smoke-tests in headless Chromium, uploads `dist/levels-of-typing.html` as `index.html` via butler, versioned by the git short hash). Then open the page and click Run game.
+
 ## How the pieces fit
 
 - **Input** is captured on `document` `keydown`, never an `<input>`, so paste can't inject text and so Level 7 can synthesise characters from `KeyboardEvent.code`. QWERTY levels use `e.key`; the Dvorak level uses `e.code` → `LAYOUTS.dvorak.map` unless calibration found the OS already types Dvorak.

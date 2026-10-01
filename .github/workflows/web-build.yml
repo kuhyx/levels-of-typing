@@ -1,0 +1,33 @@
+name: web build
+
+# The itch.io release is dist/levels-of-typing.html uploaded as-is, so CI
+# proves two things about it: that it is a fresh build of src/ (a stale
+# committed dist/ would ship old code), and that it plays -- the jsdom test
+# drives every level with real KeyboardEvents and expects "ALL PASSED".
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  web-build:
+    name: dist is current and plays
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24.21.0
+
+      - name: Rebuild dist and require it to match the commit
+        run: |
+          python3 tools/build.py
+          git diff --exit-code -- dist/
+
+      - name: Headless functional test
+        run: |
+          npm --prefix tools ci
+          node tools/test.js
