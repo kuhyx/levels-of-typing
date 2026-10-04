@@ -28,12 +28,14 @@ tools/package.json              jsdom dependency for the test (exact-pinned; loc
 data/google-10000-english-usa-no-swears.txt   word source (Google Trillion Word Corpus derivative)
 docs/DOCS-design.md             the research-backed design spec (sources at the end)
 screenshots/                    what it looked like at handoff
-scripts/                        thin shims to the shared gates in ~/utils (file length, md naming, deps)
+scripts/                        thin shims to the shared gates in ~/src/utils (file length, md naming, deps)
 ```
 
 The `src/*.js` parts are not modules: `build.py` concatenates them into one `<script>`, so they share one top-level scope and their order in `PARTS` is what resolves names. They are split only so no file exceeds the 250-line cap.
 
 ## Build and test
+
+`./run.sh` does all of the below from a clean clone and opens the game (`--test` runs the headless test instead, `--build` stops after building). The pieces, if you want them separately:
 
 ```sh
 # Arch: sudo pacman -S words nodejs npm     (Debian: apt install wamerican nodejs npm)

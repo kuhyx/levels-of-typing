@@ -19,7 +19,11 @@ ensure_pre_commit() {
         return
     fi
     echo "Installing pre-commit..."
-    if command -v pipx >/dev/null 2>&1; then
+    # Arch ships it as a package, and a fresh Arch box has neither pipx nor
+    # a pip that will install outside a venv (PEP 668), so pacman goes first.
+    if command -v pacman >/dev/null 2>&1; then
+        sudo pacman -S --needed --noconfirm pre-commit
+    elif command -v pipx >/dev/null 2>&1; then
         pipx install pre-commit
     else
         python3 -m pip install --user pre-commit
